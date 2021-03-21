@@ -45,15 +45,14 @@ jobs:
           startsWith(GITHUB_BASE_REF, 'release/') ||
           startsWith(GITHUB_BASE_REF, 'hotfix/')
         run: |
-          echo "MAVEN_PROFILES=${{MAVEN_PROFILES}},pre-release" >> $GITHUB_ENV
+          echo "MAVEN_PROFILES=${{ env.MAVEN_PROFILES }},pre-release" >> $GITHUB_ENV
       - name: Add release profile
         if: |
           startsWith(GITHUB_REF, 'refs/heads/support/') ||
           GITHUB_REF == 'refs/heads/master'
         run: |
-          
-          echo "MAVEN_PROFILES=${{MAVEN_PROFILES}},release" >> $GITHUB_ENV
-          echo "EXTRA_PARAMS=${{EXTRA_PARAMS}} -Dgpg.skip=true" >> $GITHUB_ENV
+          echo "MAVEN_PROFILES=${{ env.MAVEN_PROFILES }},release" >> $GITHUB_ENV
+          echo "EXTRA_PARAMS=${{ env.EXTRA_PARAMS }} -Dgpg.skip=true" >> $GITHUB_ENV
       - name: Cache Maven packages
         uses: actions/cache@v2
         with:
@@ -96,10 +95,9 @@ jobs:
         if: |
           startsWith(GITHUB_REF, 'refs/heads/support/')
         run: |
+          echo "SUPPORT_VERSION=${GITHUB_REF#refs/heads/support/}" >> $GITHUB_ENV
           VERSION=${GITHUB_REF#refs/heads/support/}
-          SUBDIR=${VERSION}
-          SUBDIR_PARAM= -Dscmpublish.subDirectory=${VERSION}
-          echo "EXTRA_DEPLOY_PARAMS=${{env.EXTRA_DEPLOY_PARAMS}}${{SUBDIR_PARAM}}" >> $GITHUB_ENV
+          echo "EXTRA_DEPLOY_PARAMS=${{ env.EXTRA_DEPLOY_PARAMS }} -Dscmpublish.subDirectory=${{ env.SUPPORT_VERSION }}" >> $GITHUB_ENV
       - name: Configure Git user
         run: |
           git config --global user.name "github-actions[bot]"
