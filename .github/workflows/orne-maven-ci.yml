@@ -40,16 +40,16 @@ jobs:
           java-version: 11
       - name: Add prerelease profile
         if: |
-          startsWith(GITHUB_REF, 'refs/heads/release/') ||
-          startsWith(GITHUB_REF, 'refs/heads/hotfix/') ||
-          startsWith(GITHUB_BASE_REF, 'release/') ||
-          startsWith(GITHUB_BASE_REF, 'hotfix/')
+          startsWith(github.ref, 'refs/heads/release/') ||
+          startsWith(github.ref, 'refs/heads/hotfix/') ||
+          startsWith(github.base_ref, 'release/') ||
+          startsWith(github.base_ref, 'hotfix/')
         run: |
           echo "MAVEN_PROFILES=${{ env.MAVEN_PROFILES }},pre-release" >> $GITHUB_ENV
       - name: Add release profile
         if: |
-          startsWith(GITHUB_REF, 'refs/heads/support/') ||
-          GITHUB_REF == 'refs/heads/master'
+          startsWith(github.ref, 'refs/heads/support/') ||
+          github.ref == 'refs/heads/master'
         run: |
           echo "MAVEN_PROFILES=${{ env.MAVEN_PROFILES }},release" >> $GITHUB_ENV
           echo "EXTRA_PARAMS=${{ env.EXTRA_PARAMS }} -Dgpg.skip=true" >> $GITHUB_ENV
@@ -78,8 +78,8 @@ jobs:
   site:
     needs: build
     if: |
-      startsWith(GITHUB_REF, 'refs/heads/support/') ||
-      GITHUB_REF == 'refs/heads/master'
+      startsWith(github.ref, 'refs/heads/support/') ||
+      github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     env:
       EXTRA_SITE_PARAMS: -Dgpg.skip=true
@@ -93,10 +93,9 @@ jobs:
           server-id: github
       - name: Set support folder
         if: |
-          startsWith(GITHUB_REF, 'refs/heads/support/')
+          startsWith(github.ref, 'refs/heads/support/')
         run: |
-          echo "SUPPORT_VERSION=${GITHUB_REF#refs/heads/support/}" >> $GITHUB_ENV
-          VERSION=${GITHUB_REF#refs/heads/support/}
+          echo "SUPPORT_VERSION=${github.ref#refs/heads/support/}" >> $GITHUB_ENV
           echo "EXTRA_DEPLOY_PARAMS=${{ env.EXTRA_DEPLOY_PARAMS }} -Dscmpublish.subDirectory=${{ env.SUPPORT_VERSION }}" >> $GITHUB_ENV
       - name: Configure Git user
         run: |
