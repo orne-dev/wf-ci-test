@@ -1,0 +1,121 @@
+name: Orne.dev Maven Project CI
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - 'feature/*'
+      - 'release/*'
+      - 'hotfix/*'
+      - 'support/*'
+    paths-ignore:
+      - '**/*.md'
+      - 'src/site/**/*'
+  pull_request:
+    branches:
+      - develop
+      - 'feature/*'
+      - 'release/*'
+      - 'hotfix/*'
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths-ignore:
+      - '**/*.md'
+      - 'src/site/**/*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MAVEN_PROFILES: -Put,it
+#      EXTRA_PARAMS:
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Add prerelease profile
+        if: |
+          startsWith(GITHUB_REF, 'refs/heads/release/') ||
+          startsWith(GITHUB_REF, 'refs/heads/hotfix/') ||
+          startsWith(GITHUB_BASE_REF, 'release/') ||
+          startsWith(GITHUB_BASE_REF, 'hotfix/')
+        run: |
+          echo "MAVEN_PROFILES=${{MAVEN_PROFILES}},pre-release" >> $GITHUB_ENV
+      - name: Add release profile
+        if: |
+          startsWith(GITHUB_REF, 'refs/heads/support/') ||
+          GITHUB_REF == 'refs/heads/master'
+        run: |
+          
+          echo "MAVEN_PROFILES=${{MAVEN_PROFILES}},release" >> $GITHUB_ENV
+          echo "EXTRA_PARAMS=${{EXTRA_PARAMS}} -Dgpg.skip=true" >> $GITHUB_ENV
+      - name: Cache Maven packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Verify
+        run: |
+          echo "mvn -B clean verify ${{ env.MAVEN_PROFILES }} ${{ env.EXTRA_PARAMS }}"
+      - name: Sonar analysis
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "mvn -B sonar:sonar"
+  site:
+    needs: build
+    if: |
+      startsWith(GITHUB_REF, 'refs/heads/support/') ||
+      GITHUB_REF == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    env:
+      EXTRA_SITE_PARAMS: -Dgpg.skip=true
+#      EXTRA_DEPLOY_PARAMS:
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+          server-id: github
+      - name: Set support folder
+        if: |
+          startsWith(GITHUB_REF, 'refs/heads/support/')
+        run: |
+          VERSION=${GITHUB_REF#refs/heads/support/}
+          SUBDIR=${VERSION}
+          SUBDIR_PARAM= -Dscmpublish.subDirectory=${VERSION}
+          echo "EXTRA_DEPLOY_PARAMS=${{env.EXTRA_DEPLOY_PARAMS}}${{SUBDIR_PARAM}}" >> $GITHUB_ENV
+      - name: Configure Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Cache Maven packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Generate site
+        run: |
+          echo "mvn -B clean verify site site:stage -Put,it,release ${{env.EXTRA_SITE_PARAMS }}"
+      - name: Publish site
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "mvn -B scm-publish:publish-scm ${{env.EXTRA_DEPLOY_PARAMS }}"
